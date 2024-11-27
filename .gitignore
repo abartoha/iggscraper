@@ -36,3 +36,6 @@ local_settings.py
 
 # sourec for html
 source_files/
+
+# log
+scraper.log
