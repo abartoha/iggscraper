@@ -1,24 +1,38 @@
 import json
 from bs4 import BeautifulSoup
+import requests
 
-# Specify the path to your local HTML file
-file_path = "source.html"
+def scrape_webpage(url):
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, 'html.parser')
+    scraped_data = {}
+    scraped_data['title'] = soup.find('h1', attrs={"property":"headline"}).text
+    scraped_data['genre'] = []
+    scraped_data['developers'] = []
+    scraped_data['publishers'] = []
+    scraped_data['links'] = []
+    scraped_data['release_date'] = ""
+    for p in soup.find_all('p'):
+        # adding links
+        if p.contents[0].name == 'b' and p.contents[0].text.__contains__("Link"):
+            link = p.find('a')
+            if link:
+                scraped_data['links'].append(link['href'])
+        # if p.contents[0].name == 'span' and p.contents[0].text.__contains__("Genre"):
+        # if p.contents[0].name == 'span' and p.contents[0].text.__contains__(""):
+    return scraped_data
 
-# Open the file and read its content (specifying encoding can help)
-with open(file_path, "r", encoding='utf-8') as f:
-    html_content = f.read()
+def refresh_list():
+    # Specify the path to your local JSON file
+    file_path = "games.json"
 
-# Parse the HTML content using BeautifulSoup
-soup = BeautifulSoup(html_content, 'html.parser')
+    with open(file_path, "r") as f:
+        game_data = json.load(f)
 
-# Find the mother list
-mother_div = soup.find('div', attrs={"property": "text", "class": "uk-margin-medium-top"})
+    for url in game_data.values():
+        scraped_data = scrape_webpage(url)
+        # print(scraped_data)
 
-# Find the lists for all the games
-game_data = {x.text: x['href'] for ul in mother_div.find_all('ul') for x in ul.find_all('a')}
-
-# Save the extracted list as a JSON file
-with open("games.json", "w", encoding='utf-8') as outfile:
-    json.dump(game_data, outfile, indent=4)  # Optional: indent for readability
-
-print("Game data saved to games.json!")
+if __name__ == "__main__":
+    print("Running job::module module")
+    refresh_list()
