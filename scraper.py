@@ -1,43 +1,34 @@
 import json
-import time
-import random
 import logging
-from bs4 import BeautifulSoup
-import requests
-from fake_useragent import UserAgent
-from tqdm import tqdm
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 
 # Set up logging
 logging.basicConfig(filename='scraper.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Create a UserAgent instance to generate a random User-Agent
-ua = UserAgent()
+# Set up Selenium WebDriver with options
+def create_driver():
+    chrome_options = Options()
+    # Remove headless mode
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    
+    # Set up the WebDriver path to your ChromeDriver executable
+    service = Service()  # Change this to your path
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+    return driver
 
 def scrape_webpage(url):
-    headers = {
-        'User-Agent': ua.random,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'DNT': '1',  # Do Not Track header
-        'Referer': 'https://www.google.com/',  # Set a common referrer
-        'TE': 'Trailers'
-    }
-    
+    driver = create_driver()
     try:
-        # Adding a random sleep to mimic human behavior
-        sleep_time = random.uniform(1, 5)
-        logging.info(f"Sleeping for {sleep_time:.2f} seconds")
-        time.sleep(sleep_time)
+        driver.get(url)
         
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()  # Raise an HTTPError for bad responses
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
+        # Extract data from the page using Selenium
         scraped_data = {
-            'title': soup.find('h1', attrs={"property": "headline"}).text if soup.find('h1', attrs={"property": "headline"}) else "N/A",
+            'title': driver.find_element(By.XPATH, '//h1[@property="headline"]').text if driver.find_elements(By.XPATH, '//h1[@property="headline"]') else "N/A",
             'genre': [],
             'developers': [],
             'publishers': [],
@@ -45,27 +36,29 @@ def scrape_webpage(url):
             'release_date': ""
         }
 
-        for p in soup.find_all('p'):
-            # Adding links
-            if p.contents and p.contents[0].name == 'b' and "Link" in p.contents[0].text:
-                link = p.find('a')
-                if link and 'href' in link.attrs:
-                    scraped_data['links'].append(link['href'])
+        # Extract all <p> tags for data
+        paragraphs = driver.find_elements(By.TAG_NAME, 'p')
+        for p in paragraphs:
+            text = p.text
+            # Extract links
+            if "Link" in text:
+                link_element = p.find_element(By.XPATH, './/a')
+                if link_element and link_element.get_attribute('href'):
+                    scraped_data['links'].append(link_element.get_attribute('href'))
 
-            # Extracting genre
-            if p.contents and p.contents[0].name == 'span' and "Genre" in p.contents[0].text:
-                genre_text = p.text.replace(p.contents[0].text, '').strip()
+            # Extract genres
+            if "Genre" in text:
+                genre_text = text.replace("Genre:", '').strip()
                 scraped_data['genre'] = [genre.strip() for genre in genre_text.split(',') if genre.strip()]
 
         logging.info(f"Successfully scraped data from {url}")
         return scraped_data
 
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Request error for {url}: {e}")
-        return None
     except Exception as e:
-        logging.error(f"Error parsing {url}: {e}")
+        logging.error(f"Error while scraping {url}: {e}")
         return None
+    finally:
+        driver.quit()
 
 def refresh_list():
     # Specify the path to your local JSON file
@@ -75,8 +68,7 @@ def refresh_list():
         with open(file_path, "r") as f:
             game_data = json.load(f)
 
-        # Display progress bar
-        for url in tqdm(game_data.values(), desc="Scraping URLs"):
+        for url in game_data.values():
             scraped_data = scrape_webpage(url)
             if scraped_data:
                 print(scraped_data)  # Print the scraped data for verification
