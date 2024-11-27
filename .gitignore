@@ -1,0 +1,38 @@
+# Python files
+*.pyc
+*.pyo
+__pycache__/
+.pytest_cache/
+
+# Test files
+tests/
+test_*.py
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# Build files
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Sphinx documentation
+docs/_build/
+
+# Virtual environment
+venv/
+env/
+
+# Package files
+*.egg-info
+.dist-info
+PKG-INFO
+
+# Local configuration
+local_settings.py
+
+# sourec for html
+source_files/
